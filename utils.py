@@ -61,18 +61,22 @@ def evaluate_loss(model, tr_loader, te_loader, num_batches = 10):
     return(mean_train_loss, mean_test_loss)
 
 @torch.no_grad()
-def _generate(model, idx, max_new_tokens, block_size=1):
+def _generate(model, idx, max_new_tokens, block_size=16):
     """Generates a single batch of names based on since of idx matrix. Accessed via print_samples"""
     for _ in range(max_new_tokens):
+        # print('idx shape:',idx.shape)
         idx_cond = idx if idx.size(1) <= block_size else idx[:, -block_size:]
         logits, _ = model(idx_cond)
-        logits = torch.squeeze(logits)
+        # Pick only the logits from most recent time step. Karpathy also does a divide by temp?
+        logits = logits[:,-1,:]
         probs = F.softmax(logits, dim=-1)
+        # print('prob dist:',probs)
         idx_next = torch.multinomial(probs, num_samples=1)
+        # print('idx_next shape:',idx_next.shape)
         idx = torch.cat((idx, idx_next), dim=1)
     return idx
 
-def print_samples(model, train_data, max_new_tokens, num=10):
+def print_samples(model, train_data, max_new_tokens, num=10, block_size=16,lr_exp_start=-3, lr_exp_stop=0.5):
     """ samples from the model and pretty prints the decoded samples """
     X_init = torch.zeros(num, 1, dtype=torch.long)
     X_samp = _generate(model, X_init, max_new_tokens)[:,1:].tolist()
@@ -83,8 +87,46 @@ def print_samples(model, train_data, max_new_tokens, num=10):
         row = row[:crop_index]
         print(train_data.decode(row))
 
-##TODO: 1. utility for plot the vectors for embeddings to see if they are grouping correctly
-##TODO: 2. update code for using mps as the device
-##TODO: 3. Separate tokenizer class so you dont need to pass dataset to decode
-##TODO: 4. Maybe start plotting using Bokeh or Altair
-##TODO: 5. Utilities to save model checkpoints during training
+def get_lr_loss(model, optimizer, train_dataloader, batch_size, num_epochs, lr_start_exp=-3, lr_end_exp=0.5):
+
+    lrexp = torch.linspace(lr_start_exp, lr_end_exp, num_epochs, requires_grad=False)
+    lrs_val = 10**lrexp
+
+    lri = []
+    lossi = []
+    # Training loop with mini-batches and lr sweep
+    for epoch in range(num_epochs):
+
+        ## Set learning rate
+        for g in optimizer.param_groups:
+            g['lr'] = lrs_val[epoch]
+
+        xb, yb = next(iter(train_dataloader))
+        # print(xb.shape, yb.shape)
+
+        # ix = torch.randint(0, xb.shape[0], (batch_size,))
+
+        # inputs = xb[ix]
+        # targets = yb[ix]
+
+        # Forward pass
+        _, loss = model(xb, yb)
+        lri.append(lrs_val[epoch])
+        lossi.append(loss.item())
+        # print(loss.item())
+        # loss = loss_function(outputs, labels)
+
+        # Backward pass and optimization
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    return lri, lossi
+
+##TODO: 2. What does divide by temperature do to logits
+##TODO: 2. Write a MLP which uses on 3 or 4 or  < block size context
+##TODO: 2. utility for plot the vectors for embeddings to see if they are grouping correctly
+##TODO: 3. update code for using mps as the device
+##TODO: 4. Separate tokenizer class so you dont need to pass dataset to decode
+##TODO: 5. Maybe start plotting using Bokeh or Altair
+##TODO: 6. Utilities to save model checkpoints during training
