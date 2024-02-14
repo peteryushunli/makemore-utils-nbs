@@ -68,6 +68,8 @@ def _generate(model, idx, max_new_tokens, block_size=16):
         idx_cond = idx if idx.size(1) <= block_size else idx[:, -block_size:]
         logits, _ = model(idx_cond)
         # Pick only the logits from most recent time step. Karpathy also does a divide by temp?
+        # This is just Platt scaling which makes the various Softmax curves closes adding more randomness
+        # see scratch.ipynb
         logits = logits[:,-1,:]
         probs = F.softmax(logits, dim=-1)
         # print('prob dist:',probs)
