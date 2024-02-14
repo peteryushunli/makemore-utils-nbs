@@ -125,9 +125,7 @@ def get_lr_loss(model, optimizer, train_dataloader, batch_size, num_epochs, lr_s
 
     return lri, lossi
 
-##TODO: 2. What does divide by temperature do to logits
-##TODO: 2. Write a MLP which uses on 3 or 4 or  < block size context
-##TODO: 2. utility for plot the vectors for embeddings to see if they are grouping correctly
+
 ##TODO: 3. update code for using mps as the device
 ##TODO: 4. Separate tokenizer class so you dont need to pass dataset to decode
 ##TODO: 5. Maybe start plotting using Bokeh or Altair
