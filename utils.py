@@ -80,7 +80,7 @@ def _generate(model, idx, max_new_tokens, block_size=16):
 
 def print_samples(model, train_data, max_new_tokens, num=10, block_size=16,lr_exp_start=-3, lr_exp_stop=0.5):
     """ samples from the model and pretty prints the decoded samples """
-    X_init = torch.zeros(num, 1, dtype=torch.long)
+    X_init = torch.zeros((num, 1), dtype=torch.long)
     X_samp = _generate(model, X_init, max_new_tokens)[:,1:].tolist()
     # print(X_samp)
     for row in X_samp:
