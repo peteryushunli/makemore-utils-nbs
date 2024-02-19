@@ -94,7 +94,7 @@ def print_samples(model, train_data, max_new_tokens, device, num=10):
         row = row[:crop_index]
         print(train_data.decode(row))
 
-def get_lr_loss(model, optimizer, train_dataloader, batch_size, num_epochs, lr_start_exp=-3, lr_end_exp=0.5):
+def get_lr_loss(model, optimizer, train_dataloader, num_epochs, device, lr_start_exp=-3, lr_end_exp=0.5):
 
     lrexp = torch.linspace(lr_start_exp, lr_end_exp, num_epochs, requires_grad=False)
     lrs_val = 10**lrexp
@@ -109,6 +109,8 @@ def get_lr_loss(model, optimizer, train_dataloader, batch_size, num_epochs, lr_s
             g['lr'] = lrs_val[epoch]
 
         xb, yb = next(iter(train_dataloader))
+        xb = xb.to(device)
+        yb = yb.to(device)
         # print(xb.shape, yb.shape)
 
         # ix = torch.randint(0, xb.shape[0], (batch_size,))
