@@ -131,7 +131,6 @@ def get_lr_loss(model, optimizer, train_dataloader, batch_size, num_epochs, lr_s
     return lri, lossi
 
 
-##TODO: 3. update code for using mps as the device
 ##TODO: 4. Separate tokenizer class so you dont need to pass dataset to decode
 ##TODO: 5. Maybe start plotting using Bokeh or Altair
 ##TODO: 6. Utilities to save model checkpoints during training
