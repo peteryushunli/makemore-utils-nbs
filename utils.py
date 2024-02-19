@@ -43,13 +43,17 @@ class CharDataset(Dataset):
         return x, y
 
 @torch.inference_mode()
-def evaluate_loss(model, tr_loader, te_loader, num_batches = 10):
+def evaluate_loss(model, tr_loader, te_loader, device, num_batches = 10):
     model.eval()
     loss_tr = []
     loss_te = []
     for n in range(num_batches):
         Xtr, Ytr = next(iter(tr_loader))
         Xte, Yte = next(iter(te_loader))
+        Xtr = Xtr.to(device)
+        Ytr = Ytr.to(device)
+        Xte = Xte.to(device)
+        Yte = Yte.to(device)
         _, train_loss = model(Xtr, Ytr)
         _, test_loss = model(Xte, Yte)
         loss_tr.append(train_loss)
@@ -61,11 +65,12 @@ def evaluate_loss(model, tr_loader, te_loader, num_batches = 10):
     return(mean_train_loss, mean_test_loss)
 
 @torch.no_grad()
-def _generate(model, idx, max_new_tokens, block_size=16):
+def _generate(model, idx, max_new_tokens, device, block_size=16):
     """Generates a single batch of names based on since of idx matrix. Accessed via print_samples"""
     for _ in range(max_new_tokens):
         # print('idx shape:',idx.shape)
         idx_cond = idx if idx.size(1) <= block_size else idx[:, -block_size:]
+        idx_cond = idx_cond.to(device)
         logits, _ = model(idx_cond)
         # Pick only the logits from most recent time step. Karpathy also does a divide by temp?
         # This is just Platt scaling which makes the various Softmax curves closes adding more randomness
@@ -78,10 +83,10 @@ def _generate(model, idx, max_new_tokens, block_size=16):
         idx = torch.cat((idx, idx_next), dim=1)
     return idx
 
-def print_samples(model, train_data, max_new_tokens, num=10, block_size=16,lr_exp_start=-3, lr_exp_stop=0.5):
+def print_samples(model, train_data, max_new_tokens, device, num=10):
     """ samples from the model and pretty prints the decoded samples """
-    X_init = torch.zeros((num, 1), dtype=torch.long)
-    X_samp = _generate(model, X_init, max_new_tokens)[:,1:].tolist()
+    X_init = torch.zeros((num, 1), dtype=torch.long).to(device)
+    X_samp = _generate(model, X_init, max_new_tokens, device)[:,1:].tolist()
     # print(X_samp)
     for row in X_samp:
         crop_index = row.index(0) if 0 in row else len(row)
