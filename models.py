@@ -5,7 +5,6 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
-from sklearn.manifold import TSNE
 import numpy as np
 import torch
 
@@ -153,33 +152,6 @@ class Pyt_Attention_Xformer(nn.Module):
 
         return(logits,loss)
     
-class Xformer_pyt_decoder(nn.Module):
-    def __init__(self, emb_dim, vocab_size, num_heads=4, num_layers=3):
-        super().__init__()
-        self.token_embedding = nn.Embedding(vocab_size + 1, emb_dim)
-        self.pos_embedding = nn.Embedding(vocab_size + 1, emb_dim)
-        self.decoder_layers = nn.TransformerDecoderLayer(d_model=emb_dim, nhead=num_heads)
-        self.transformer_decoder = nn.TransformerDecoder(self.decoder_layers, num_layers=num_layers)
-        self.layer_norm = nn.LayerNorm(emb_dim)
-        self.lm_head = nn.Linear(emb_dim, vocab_size)
-
-    def forward(self, x, targets=None):
-        tok_emb = self.token_embedding(x)
-        pos_emb = self.pos_embedding(x)
-        x = tok_emb + pos_emb  # B, T, emb_dim
-        memory = x.clone()  # Initialize memory with the input
-        x = self.transformer_decoder(x, memory)
-        x = self.layer_norm(x)
-        logits = self.lm_head(x)  # B, T, vocab_size
-
-        # if we are given some desired targets also calculate the loss
-        loss = None
-        if targets is not None:
-            # print(logits.view(-1, logits.size(-1)).shape, targets.view(-1).shape)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
-
-        return(logits,loss)
-    
 class Head(nn.Module):
     def __init__(self, emb_dim, head_size, block_length, dropout):
         super().__init__()
@@ -205,9 +177,9 @@ class Head(nn.Module):
         return out
     
 class MultiHeadAttentionModuleList(nn.Module):
-    def __init__(self, head_size, num_heads, emb_dim, dropout):
+    def __init__(self, head_size, num_heads, emb_dim, block_length, dropout):
         super().__init__()
-        self.heads = nn.ModuleList([Head(emb_dim, head_size) for i in range(num_heads)]) # B,T,head_size*num_heads
+        self.heads = nn.ModuleList([Head(emb_dim, head_size, block_length, dropout) for i in range(num_heads)]) # B,T,head_size*num_heads
         self.proj = nn.Linear(emb_dim, emb_dim)
         self.dropout = nn.Dropout(dropout)
 
@@ -217,17 +189,33 @@ class MultiHeadAttentionModuleList(nn.Module):
         x = self.dropout(x)
         return x
     
+class BlockScratch(nn.Module):
+    def __init__(self, emb_dim, num_heads, block_length, dropout):
+        super().__init__()
+        self.head_size = emb_dim // num_heads
+        self.sa_head = MultiHeadAttentionModuleList(self.head_size, num_heads, emb_dim, block_length,dropout)
+        self.ff = Feedforward(emb_dim, dropout)
+        self.ln1 = nn.LayerNorm(emb_dim)
+        self.ln2 = nn.LayerNorm(emb_dim)
+
+    def forward(self, x, targets=None):
+        sa_out = self.sa_head(self.ln1(x))
+        x = x + sa_out
+        x = x + self.ff(self.ln2(x))
+        return x
+    
+    
 class Xformer_Scratch(nn.Module):
-    def __init__(self, emb_dim, vocab_size, num_heads, dropout):
+    def __init__(self, emb_dim, vocab_size, num_heads, block_length, dropout):
         super().__init__()
         self.token_embedding = nn.Embedding(vocab_size + 1, emb_dim)
         self.pos_embedding = nn.Embedding(vocab_size + 1, emb_dim)
         # self.sa_head = MultiHeadAttention(emb_dim//4, 4, emb_dim, block_length)
         # self.ff = Feedforward(emb_dim)
         self.blocks = nn.Sequential(
-            Block(emb_dim, num_heads, dropout), 
-            Block(emb_dim, num_heads, dropout),
-            Block(emb_dim, num_heads, dropout),
+            BlockScratch(emb_dim, num_heads, block_length, dropout), 
+            BlockScratch(emb_dim, num_heads, block_length, dropout),
+            BlockScratch(emb_dim, num_heads, block_length, dropout),
             nn.LayerNorm(emb_dim)
         )
         self.lm_head = nn.Linear(emb_dim, vocab_size)
