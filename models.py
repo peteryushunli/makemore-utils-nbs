@@ -1,11 +1,7 @@
 import sys
 sys.path.append('/Users/shwetank/code/makemore-utils-nbs')
-from utils import create_dataset, CharDataset, evaluate_loss, print_samples
-from torch.utils.data import DataLoader
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.optim import Adam
-import numpy as np
 import torch
 
 class Bigram(nn.Module):
@@ -24,6 +20,8 @@ class Bigram(nn.Module):
             loss = F.cross_entropy(logits, targets, ignore_index=-1)
             
         return logits, loss
+    
+##------------------------- 
     
 class MLP(nn.Module):
     """
@@ -81,17 +79,7 @@ class MLP(nn.Module):
 
         return logits, loss
 
-#----------Transformer using Pytorch attention block----------
-    
-class  MultiHeadAttention(nn.Module):
-    def __init__(self, num_heads, emb_dim, dropout):
-        super().__init__()
-        self.heads = nn.MultiheadAttention(emb_dim, num_heads, dropout=dropout, bias=False)
-
-    def forward(self, x):
-        x = self.heads(x,x,x)
-        return x
-    
+##-------------------------
 class Feedforward(nn.Module):
     def __init__(self, emb_dim, dropout):
         super().__init__()
@@ -105,52 +93,6 @@ class Feedforward(nn.Module):
     def forward(self,x):
         return self.ff(x)
     
-class Block(nn.Module):
-    def __init__(self, emb_dim, num_heads, dropout):
-        super().__init__()
-        self.head_size = emb_dim // num_heads
-        self.sa_head = MultiHeadAttention(num_heads, emb_dim, dropout)
-        self.ff = Feedforward(emb_dim, dropout)
-        self.ln1 = nn.LayerNorm(emb_dim)
-        self.ln2 = nn.LayerNorm(emb_dim)
-
-    def forward(self, x, targets=None):
-        sa_out, sq_wte = self.sa_head(self.ln1(x))
-        x = x + sa_out
-        x = x + self.ff(self.ln2(x))
-        return x
-    
-class Pyt_Attention_Xformer(nn.Module):
-    def __init__(self, emb_dim,  vocab_size, num_heads, dropout):
-        super().__init__()
-        self.token_embedding = nn.Embedding(vocab_size + 1, emb_dim)
-        self.pos_embedding = nn.Embedding(vocab_size + 1, emb_dim)
-        # self.sa_head = MultiHeadAttention(emb_dim//4, 4, emb_dim, block_length)
-        # self.ff = Feedforward(emb_dim)
-        self.blocks = nn.Sequential(
-            Block(emb_dim, num_heads, dropout), 
-            Block(emb_dim, num_heads, dropout),
-            Block(emb_dim, num_heads, dropout),
-            nn.LayerNorm(emb_dim)
-        )
-        self.lm_head = nn.Linear(emb_dim, vocab_size)
-
-    def forward(self, x, targets=None):
-        tok_emb = self.token_embedding(x)
-        pos_emb = self.pos_embedding(x)
-        x = tok_emb + pos_emb # B, T, emb_dim
-        # x = self.sa_head(x) # B, T, head_size
-        # x =  self.ff(x)
-        x = self.blocks(x)
-        logits = self.lm_head(x) # B, T, vocab_size
-
-        # if we are given some desired targets also calculate the loss
-        loss = None
-        if targets is not None:
-            # print(logits.view(-1, logits.size(-1)).shape, targets.view(-1).shape)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
-
-        return(logits,loss)
     
 class Head(nn.Module):
     def __init__(self, emb_dim, head_size, block_length, dropout):
@@ -210,8 +152,6 @@ class Xformer_Scratch(nn.Module):
         super().__init__()
         self.token_embedding = nn.Embedding(vocab_size + 1, emb_dim)
         self.pos_embedding = nn.Embedding(vocab_size + 1, emb_dim)
-        # self.sa_head = MultiHeadAttention(emb_dim//4, 4, emb_dim, block_length)
-        # self.ff = Feedforward(emb_dim)
         self.blocks = nn.Sequential(
             BlockScratch(emb_dim, num_heads, block_length, dropout), 
             BlockScratch(emb_dim, num_heads, block_length, dropout),
@@ -232,7 +172,6 @@ class Xformer_Scratch(nn.Module):
         # if we are given some desired targets also calculate the loss
         loss = None
         if targets is not None:
-            # print(logits.view(-1, logits.size(-1)).shape, targets.view(-1).shape)
             loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
 
         return(logits,loss)
