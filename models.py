@@ -156,6 +156,9 @@ class Xformer_Scratch(nn.Module):
             BlockScratch(emb_dim, num_heads, block_length, dropout), 
             BlockScratch(emb_dim, num_heads, block_length, dropout),
             BlockScratch(emb_dim, num_heads, block_length, dropout),
+            BlockScratch(emb_dim, num_heads, block_length, dropout), 
+            BlockScratch(emb_dim, num_heads, block_length, dropout),
+            BlockScratch(emb_dim, num_heads, block_length, dropout),
             nn.LayerNorm(emb_dim)
         )
         self.lm_head = nn.Linear(emb_dim, vocab_size)
